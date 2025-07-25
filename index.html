@@ -50,12 +50,18 @@
         </footer>
     </div>
 
-    <script src="https://unpkg.com/@solana/web3.js@1.91.0/lib/index.iife.min.js"></script>
-    <script src="script.js"></script>
-</body>
-</html>
+    <script src="https://unpkg.com/buffer@6.0.3/index.js"></script>
+    <script>
+        // Asegúrate de que 'Buffer' esté disponible globalmente como 'window.Buffer'
+        // Esto es necesario si la librería 'buffer' no lo expone automáticamente así.
+        if (typeof window.Buffer === 'undefined') {
+            window.Buffer = require('buffer').Buffer;
+        }
+    </script>
 
     <script src="https://unpkg.com/@solana/web3.js@1.91.0/lib/index.iife.min.js"></script>
+
     <script src="script.js"></script>
+
 </body>
 </html>
