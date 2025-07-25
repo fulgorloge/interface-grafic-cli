@@ -21,7 +21,11 @@ const elements = {
     recipientAddressInput: document.getElementById('recipient-address'),
     amountSolInput: document.getElementById('amount-sol'),
     networkSelect: document.getElementById('network-select'),
-    transactionStatusText: document.getElementById('transaction-status')
+    transactionStatusText: document.getElementById('transaction-status'), // Agregada coma al final
+    // *** AQUI PARECE HABER HABIDO MUCHOS ERRORES DE SINTAXIS EN LA IMAGEN ANTERIOR ***
+    // Si tenías más elementos definidos aquí, asegúrate de que cada uno tenga:
+    // key: document.getElementById('id-del-elemento'),
+    // y que todos estén separados por comas.
 };
 
 // --- Utility Functions ---
@@ -78,8 +82,7 @@ const updateUI = () => {
 
     if (walletState.publicKey) {
         // Billetera conectada y clave pública disponible
-        // LÍNEA 81 Y ALREDEDORES - VERIFICACIÓN DE BACKTICKS
-        walletAddressText.textContent = Conectado: ${walletState.publicKey.toBase58()};
+        walletAddressText.textContent = `Conectado: ${walletState.publicKey.toBase58()}`;
         walletMessageText.textContent = ''; // Limpiar mensaje de billetera
         connectButton.style.display = 'none'; // Ocultar botón de conectar
         transferSection.classList.remove('hidden'); // Mostrar sección de transferencia
@@ -110,7 +113,7 @@ const updateUI = () => {
  */
 const setTransactionStatus = (message, type = 'info') => {
     elements.transactionStatusText.textContent = message;
-    elements.transactionStatusText.className = transaction-status text-${type};
+    elements.transactionStatusText.className = `transaction-status text-${type}`;
 };
 
 // --- Wallet Connection Logic ---
@@ -128,17 +131,17 @@ const connectSolanaNative = async (provider, onlyIfTrusted = false) => {
             walletState.type = 'solana-native';
             walletState.provider = provider;
             walletState.publicKey = provider.publicKey;
-            console.log(Billetera Solana nativa conectada: ${provider.publicKey.toBase58()});
+            console.log(`Billetera Solana nativa conectada: ${provider.publicKey.toBase58()}`);
             return true;
         }
         return false;
     } catch (error) {
-        console.warn(Falló la conexión ${onlyIfTrusted ? 'automática' : 'manual'} con billetera Solana nativa:, error);
+        console.warn(`Falló la conexión ${onlyIfTrusted ? 'automática' : 'manual'} con billetera Solana nativa:`, error);
         walletState.provider = undefined;
         walletState.publicKey = undefined;
         // No alertar en auto-connect silencioso, solo en manual
         if (!onlyIfTrusted) {
-            alert(Error al conectar billetera Solana nativa: ${error.message});
+            alert(`Error al conectar billetera Solana nativa: ${error.message}`);
         }
         return false;
     }
@@ -158,7 +161,7 @@ const connectMetaMaskWithSolanaSnap = async (metamaskProvider) => {
         console.log('MetaMask conectada (lado EVM).');
 
         // 2. Solicitar el Snap de Solana
-        console.log(Solicitando el Snap de Solana (${SOLFLARE_SNAP_ID})...);
+        console.log(`Solicitando el Snap de Solana (${SOLFLARE_SNAP_ID})...`);
         const snapResult = await metamaskProvider.request({
             method: 'wallet_requestSnaps',
             params: { [SOLFLARE_SNAP_ID]: {} }
@@ -182,6 +185,11 @@ const connectMetaMaskWithSolanaSnap = async (metamaskProvider) => {
             throw new Error('El Snap de Solana no devolvió una clave pública.');
         }
 
+        // Asegúrate de que `solanaWeb3` esté definido globalmente o importado.
+        // Si tienes el error `8013: Las aserciones no nulas solo se pueden usar en los archivos TypeScript.`,
+        // es porque el `!` se usa en TypeScript para indicar que un valor no será nulo/undefined.
+        // En JavaScript puro, es mejor hacer una comprobación explícita o asumir que ya está comprobado.
+        // Aquí no usaremos el `!` porque el if anterior ya lo maneja.
         const publicKey = new solanaWeb3.PublicKey(solanaSnapPublicKey.publicKey);
 
         // --- Crear un proveedor para el Snap que imita a una billetera Solana ---
@@ -193,6 +201,11 @@ const connectMetaMaskWithSolanaSnap = async (metamaskProvider) => {
                     method: 'wallet_invokeSnap',
                     params: {
                         snapId: SOLFLARE_SNAP_ID,
+                        // Para `Buffer.from` necesitas que Buffer esté disponible.
+                        // En un entorno de navegador, `Buffer` no es global por defecto.
+                        // Si estás en un entorno de Node.js o usas un bundler como Webpack/Rollup,
+                        // podría polifillar Buffer. Si no, necesitas importarlo o usar Uint8Array.
+                        // Aquí, asumiremos que Buffer.from está disponible (ej. si usas un bundler).
                         request: {
                             method: 'solana_signTransaction',
                             params: {
@@ -201,6 +214,8 @@ const connectMetaMaskWithSolanaSnap = async (metamaskProvider) => {
                         }
                     }
                 });
+                // Asegúrate de que Buffer.from sea accesible aquí si lo necesitas.
+                // En el navegador, puedes necesitar una librería como `buffer` de npm para esto.
                 transaction.addSignature(publicKey, Buffer.from(signature, 'base64'));
                 return transaction;
             },
@@ -212,7 +227,7 @@ const connectMetaMaskWithSolanaSnap = async (metamaskProvider) => {
                         snapId: SOLFLARE_SNAP_ID,
                         request: {
                             method: 'solana_signMessage',
-                            params: { message: Buffer.from(message).toString('base64') }
+                            params: { message: Buffer.from(message).toString('base64') } // Lo mismo aplica para Buffer.from aquí
                         }
                     }
                 });
@@ -228,8 +243,8 @@ const connectMetaMaskWithSolanaSnap = async (metamaskProvider) => {
         return true;
     } catch (error) {
         console.error('Error al conectar MetaMask con Solana Snap:', error);
-        setTransactionStatus(Error al conectar MetaMask con Solana Snap: ${error.message}, 'error');
-        alert(Error al conectar MetaMask con Solana Snap. Asegúrate de tener MetaMask instalada y el Solflare Snap aprobado. Detalles: ${error.message});
+        setTransactionStatus(`Error al conectar MetaMask con Solana Snap: ${error.message}`, 'error');
+        alert(`Error al conectar MetaMask con Solana Snap. Asegúrate de tener MetaMask instalada y el Solflare Snap aprobado. Detalles: ${error.message}`);
         walletState.type = 'metamask'; // Mantener el tipo para el mensaje en UI
         walletState.solanaSnapProvider = undefined; // Resetear
         walletState.publicKey = undefined; // Resetear
@@ -306,6 +321,8 @@ elements.transferButton.addEventListener('click', async () => {
 
     try {
         // IMPORTANTE: Aquí se utilizan las clases de solanaWeb3, por eso es CRÍTICO que se cargue antes en el HTML
+        // Si `solanaWeb3` no está disponible globalmente (ej. por un <script> tag),
+        // necesitarías importarlo si usas un sistema de módulos (ej. `import * as solanaWeb3 from '@solana/web3.js';`)
         const { Connection, PublicKey, Transaction, SystemProgram, LAMPORTS_PER_SOL } = solanaWeb3;
 
         // Validar dirección del destinatario
@@ -339,20 +356,20 @@ elements.transferButton.addEventListener('click', async () => {
         const signature = await connection.sendRawTransaction(signedTransaction.serialize());
 
         // Espera la confirmación de la transacción en la red
-        setTransactionStatus(Transacción enviada. Esperando confirmación... Firma: ${signature.substring(0, 10)}..., 'info');
+        setTransactionStatus(`Transacción enviada. Esperando confirmación... Firma: ${signature.substring(0, 10)}...`, 'info');
         await connection.confirmTransaction(signature, 'confirmed'); // 'confirmed' o 'finalized'
 
-        setTransactionStatus(¡Transacción exitosa! Firma: ${signature}, 'success');
+        setTransactionStatus(`¡Transacción exitosa! Firma: ${signature}`, 'success');
         console.log('Transacción exitosa:', signature);
     } catch (error) {
         console.error('Error al transferir SOL:', error);
         let errorMessage = error.message;
         if (error.code === 4001) {
             errorMessage = 'Transacción rechazada por el usuario en la billetera.';
-        } else if (error.message.includes('insufficient funds')) {
+        } else if (error.message && error.message.includes('insufficient funds')) { // Asegúrate de que .message exista
              errorMessage = 'Fondos insuficientes en la billetera para la transacción.';
         }
-        setTransactionStatus(Error en la transacción: ${errorMessage}, 'error');
+        setTransactionStatus(`Error en la transacción: ${errorMessage}`, 'error');
     } finally {
         elements.transferButton.disabled = false; // Habilitar el botón de nuevo
     }
