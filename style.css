@@ -1,0 +1,213 @@
+/* Variables CSS para consistencia */
+:root {
+    --primary-color: #007bff;
+    --success-color: #28a745;
+    --error-color: #dc3545;
+    --text-color: #333;
+    --light-text-color: #555;
+    --background-color: #f0f2f5;
+    --card-background: #fff;
+    --border-color: #e0e0e0;
+    --shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    --border-radius: 8px;
+    --font-family: 'Inter', sans-serif;
+}
+
+body {
+    font-family: var(--font-family);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    background-color: var(--background-color);
+    margin: 0;
+    padding: 20px;
+    color: var(--text-color);
+    line-height: 1.6;
+}
+
+.container {
+    background-color: var(--card-background);
+    padding: 40px;
+    border-radius: var(--border-radius);
+    box-shadow: var(--shadow);
+    text-align: center;
+    max-width: 550px;
+    width: 100%;
+    box-sizing: border-box; /* Incluir padding en el ancho total */
+}
+
+/* Encabezado */
+.app-header h1 {
+    color: var(--primary-color);
+    margin-bottom: 10px;
+    font-size: 2.2em;
+    font-weight: 700;
+}
+
+.app-header .highlight {
+    color: #4CAF50; /* Un color diferente para resaltar "Solana" */
+}
+
+.message-text {
+    font-size: 0.95em;
+    color: var(--light-text-color);
+    min-height: 20px; /* Para evitar saltos de diseño */
+}
+
+/* Estado de la billetera */
+.wallet-status {
+    margin-top: 25px;
+    margin-bottom: 25px;
+}
+
+.address-display {
+    font-weight: 500;
+    margin-bottom: 20px;
+    color: var(--text-color);
+    word-wrap: break-word; /* Para que la dirección larga se ajuste */
+}
+
+/* Botones */
+.btn {
+    padding: 12px 25px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 1em;
+    font-weight: 600;
+    transition: background-color 0.3s ease, transform 0.2s ease;
+    width: 100%;
+    max-width: 250px; /* Ancho máximo para los botones */
+    margin-top: 10px;
+}
+
+.btn-primary {
+    background-color: var(--primary-color);
+    color: white;
+}
+
+.btn-primary:hover:not(:disabled) {
+    background-color: #0056b3;
+    transform: translateY(-2px);
+}
+
+.btn-success {
+    background-color: var(--success-color);
+    color: white;
+}
+
+.btn-success:hover:not(:disabled) {
+    background-color: #218838;
+    transform: translateY(-2px);
+}
+
+.btn:disabled {
+    background-color: #cccccc;
+    cursor: not-allowed;
+    opacity: 0.8;
+}
+
+/* Separador */
+hr {
+    border: 0;
+    height: 1px;
+    background: var(--border-color);
+    margin: 30px 0;
+}
+
+/* Sección de Transferencia */
+.transfer-section {
+    margin-top: 30px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border-color);
+}
+
+.transfer-section h2 {
+    color: var(--primary-color);
+    margin-bottom: 25px;
+    font-size: 1.8em;
+}
+
+.transfer-section h2 .highlight {
+    color: #4CAF50;
+}
+
+.form-group {
+    margin-bottom: 20px;
+    text-align: left;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 500;
+    color: var(--light-text-color);
+}
+
+.form-control {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 5px;
+    box-sizing: border-box;
+    font-size: 1em;
+    color: var(--text-color);
+    background-color: #fdfdfd;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.form-control:focus {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.25);
+    outline: none;
+}
+
+/* Estado de la Transacción */
+.transaction-status {
+    margin-top: 20px;
+    font-weight: 600;
+    word-wrap: break-word;
+    min-height: 20px; /* Para evitar saltos de diseño */
+}
+
+/* Clases de utilidad para JS */
+.hidden {
+    display: none !important;
+}
+
+.text-success {
+    color: var(--success-color);
+}
+
+.text-error {
+    color: var(--error-color);
+}
+
+.text-info {
+    color: var(--primary-color);
+}
+
+/* Pie de página */
+.app-footer {
+    margin-top: 40px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border-color);
+    font-size: 0.85em;
+    color: var(--light-text-color);
+}
+
+/* Responsividad básica */
+@media (max-width: 600px) {
+    .container {
+        padding: 25px;
+    }
+
+    .app-header h1 {
+        font-size: 1.8em;
+    }
+
+    .btn {
+        max-width: 100%;
+    }
+}

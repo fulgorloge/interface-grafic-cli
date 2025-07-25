@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Conexión y Transferencia Solana</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header class="app-header">
+            <h1><span class="highlight">Solana</span> Wallet & Snap</h1>
+            <p id="wallet-message" class="message-text"></p>
+        </header>
+
+        <section class="wallet-status">
+            <p id="wallet-address" class="address-display">Estado: Desconectado</p>
+            <button id="connect-button" class="btn btn-primary">Conectar Billetera</button>
+        </section>
+
+        <hr>
+
+        <section id="transfer-section" class="transfer-section hidden">
+            <h2>Transferir <span class="highlight">SOL</span></h2>
+            <div class="form-group">
+                <label for="network-select">Red Solana:</label>
+                <select id="network-select" class="form-control">
+                    <option value="devnet">Devnet</option>
+                    <option value="testnet">Testnet</option>
+                    <option value="mainnet-beta">Mainnet Beta</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="recipient-address">Dirección del Destinatario:</label>
+                <input type="text" id="recipient-address" class="form-control" placeholder="Ej: 5wN...XYZ">
+            </div>
+            <div class="form-group">
+                <label for="amount-sol">Cantidad de SOL:</label>
+                <input type="number" id="amount-sol" class="form-control" step="0.0001" value="0.01">
+            </div>
+            <button id="transfer-button" class="btn btn-success">Transferir SOL</button>
+            <p id="transaction-status" class="transaction-status"></p>
+        </section>
+
+        <footer class="app-footer">
+            <p>&copy; 2025 Aplicación Solana. Todos los derechos reservados.</p>
+        </footer>
+    </div>
+
+    <script src="https://unpkg.com/@solana/web3.js@1.91.0/lib/index.iife.min.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
