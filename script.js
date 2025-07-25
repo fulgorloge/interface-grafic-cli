@@ -78,6 +78,7 @@ const updateUI = () => {
 
     if (walletState.publicKey) {
         // Billetera conectada y clave pública disponible
+        // LÍNEA 81 Y ALREDEDORES - VERIFICACIÓN DE BACKTICKS
         walletAddressText.textContent = Conectado: ${walletState.publicKey.toBase58()};
         walletMessageText.textContent = ''; // Limpiar mensaje de billetera
         connectButton.style.display = 'none'; // Ocultar botón de conectar
@@ -132,7 +133,7 @@ const connectSolanaNative = async (provider, onlyIfTrusted = false) => {
         }
         return false;
     } catch (error) {
-        console.warn(Fallo la conexión ${onlyIfTrusted ? 'automática' : 'manual'} con billetera Solana nativa:, error);
+        console.warn(Falló la conexión ${onlyIfTrusted ? 'automática' : 'manual'} con billetera Solana nativa:, error);
         walletState.provider = undefined;
         walletState.publicKey = undefined;
         // No alertar en auto-connect silencioso, solo en manual
@@ -304,6 +305,7 @@ elements.transferButton.addEventListener('click', async () => {
     }
 
     try {
+        // IMPORTANTE: Aquí se utilizan las clases de solanaWeb3, por eso es CRÍTICO que se cargue antes en el HTML
         const { Connection, PublicKey, Transaction, SystemProgram, LAMPORTS_PER_SOL } = solanaWeb3;
 
         // Validar dirección del destinatario
