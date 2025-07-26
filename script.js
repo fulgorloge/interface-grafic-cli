@@ -21,11 +21,7 @@ const elements = {
     recipientAddressInput: document.getElementById('recipient-address'),
     amountSolInput: document.getElementById('amount-sol'),
     networkSelect: document.getElementById('network-select'),
-    transactionStatusText: document.getElementById('transaction-status'), // Agregada coma al final
-    // *** AQUI PARECE HABER HABIDO MUCHOS ERRORES DE SINTAXIS EN LA IMAGEN ANTERIOR ***
-    // Si tenías más elementos definidos aquí, asegúrate de que cada uno tenga:
-    // key: document.getElementById('id-del-elemento'),
-    // y que todos estén separados por comas.
+    transactionStatusText: document.getElementById('transaction-status'), // <-- Esta coma es crucial y fue una de las correcciones iniciales
 };
 
 // --- Utility Functions ---
@@ -185,11 +181,6 @@ const connectMetaMaskWithSolanaSnap = async (metamaskProvider) => {
             throw new Error('El Snap de Solana no devolvió una clave pública.');
         }
 
-        // Asegúrate de que `solanaWeb3` esté definido globalmente o importado.
-        // Si tienes el error `8013: Las aserciones no nulas solo se pueden usar en los archivos TypeScript.`,
-        // es porque el `!` se usa en TypeScript para indicar que un valor no será nulo/undefined.
-        // En JavaScript puro, es mejor hacer una comprobación explícita o asumir que ya está comprobado.
-        // Aquí no usaremos el `!` porque el if anterior ya lo maneja.
         const publicKey = new solanaWeb3.PublicKey(solanaSnapPublicKey.publicKey);
 
         // --- Crear un proveedor para el Snap que imita a una billetera Solana ---
@@ -201,11 +192,6 @@ const connectMetaMaskWithSolanaSnap = async (metamaskProvider) => {
                     method: 'wallet_invokeSnap',
                     params: {
                         snapId: SOLFLARE_SNAP_ID,
-                        // Para `Buffer.from` necesitas que Buffer esté disponible.
-                        // En un entorno de navegador, `Buffer` no es global por defecto.
-                        // Si estás en un entorno de Node.js o usas un bundler como Webpack/Rollup,
-                        // podría polifillar Buffer. Si no, necesitas importarlo o usar Uint8Array.
-                        // Aquí, asumiremos que Buffer.from está disponible (ej. si usas un bundler).
                         request: {
                             method: 'solana_signTransaction',
                             params: {
@@ -214,8 +200,7 @@ const connectMetaMaskWithSolanaSnap = async (metamaskProvider) => {
                         }
                     }
                 });
-                // Asegúrate de que Buffer.from sea accesible aquí si lo necesitas.
-                // En el navegador, puedes necesitar una librería como `buffer` de npm para esto.
+                // Buffer.from es lo que causaba el error si el polyfill no estaba correctamente configurado
                 transaction.addSignature(publicKey, Buffer.from(signature, 'base64'));
                 return transaction;
             },
@@ -227,7 +212,7 @@ const connectMetaMaskWithSolanaSnap = async (metamaskProvider) => {
                         snapId: SOLFLARE_SNAP_ID,
                         request: {
                             method: 'solana_signMessage',
-                            params: { message: Buffer.from(message).toString('base64') } // Lo mismo aplica para Buffer.from aquí
+                            params: { message: Buffer.from(message).toString('base64') }
                         }
                     }
                 });
@@ -321,8 +306,6 @@ elements.transferButton.addEventListener('click', async () => {
 
     try {
         // IMPORTANTE: Aquí se utilizan las clases de solanaWeb3, por eso es CRÍTICO que se cargue antes en el HTML
-        // Si `solanaWeb3` no está disponible globalmente (ej. por un <script> tag),
-        // necesitarías importarlo si usas un sistema de módulos (ej. `import * as solanaWeb3 from '@solana/web3.js';`)
         const { Connection, PublicKey, Transaction, SystemProgram, LAMPORTS_PER_SOL } = solanaWeb3;
 
         // Validar dirección del destinatario
@@ -366,7 +349,7 @@ elements.transferButton.addEventListener('click', async () => {
         let errorMessage = error.message;
         if (error.code === 4001) {
             errorMessage = 'Transacción rechazada por el usuario en la billetera.';
-        } else if (error.message && error.message.includes('insufficient funds')) { // Asegúrate de que .message exista
+        } else if (error.message && error.message.includes('insufficient funds')) {
              errorMessage = 'Fondos insuficientes en la billetera para la transacción.';
         }
         setTransactionStatus(`Error en la transacción: ${errorMessage}`, 'error');
