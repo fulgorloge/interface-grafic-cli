@@ -1,526 +1,488 @@
-// script.js
+// Accede a la librería de Solana (cargada globalmente en index.html)
+const solanaWeb3 = SolanaWeb3; 
 
-// --- Global State Management ---
-const walletState = {
-    type: 'none', // 'solana-native', 'metamask', 'none'
-    provider: undefined, // El objeto del proveedor nativo (e.g., window.solana, window.ethereum)
-    solanaSnapProvider: undefined, // El objeto del Snap de Solana si se usa MetaMask
-    publicKey: undefined // La clave pública de la billetera conectada (PublicKey de solanaWeb3)
-};
+let provider; // Wallet adapter (Phantom o Solflare)
+let publicKey; // Public key del usuario
 
-// ID del Snap de Solflare (debe ser el correcto para el Snap que quieres usar)
-const SOLFLARE_SNAP_ID = 'npm:@solflare/solana-snap';
+// --- Elementos del DOM ---
+const statusMessage = document.getElementById('status-message');
+const walletAddressElem = document.getElementById('wallet-address');
+const solBalanceElem = document.getElementById('sol-balance');
+const fiatBalanceElem = document.getElementById('fiat-balance');
+const disconnectWalletBtn = document.getElementById('disconnect-wallet');
+const connectPhantomBtn = document.getElementById('connect-phantom');
+const connectSolflareBtn = document.getElementById('connect-solflare');
+const recipientAddressInput = document.getElementById('recipient-address');
+const sendAmountInput = document.getElementById('send-amount');
+const sendSolBtn = document.getElementById('send-sol-btn');
+const sendSolSpinner = document.getElementById('send-sol-spinner');
+const transactionStatusElem = document.getElementById('transaction-status');
+const recipientAddressError = document.getElementById('recipient-address-error');
+const sendAmountError = document.getElementById('send-amount-error');
+const fiatAmountInput = document.getElementById('fiat-amount');
+const cryptoAmountInput = document.getElementById('crypto-amount');
+const transactionHistoryElem = document.getElementById('transaction-history');
+const themeToggleBtn = document.getElementById('theme-toggle');
 
-// --- DOM Elements Cache ---
-const elements = {
-    connectButton: document.getElementById('connect-button'),
-    disconnectButton: document.getElementById('disconnect-button'),
-    walletAddressText: document.getElementById('wallet-address'),
-    walletMessageText: document.getElementById('wallet-message'),
-    walletBalanceText: document.getElementById('wallet-balance'),
-    copyAddressButton: document.getElementById('copy-address-button'), 
-    transferSection: document.getElementById('transfer-section'),
-    transferButton: document.getElementById('transfer-button'),
-    recipientAddressInput: document.getElementById('recipient-address'),
-    amountSolInput: document.getElementById('amount-sol'),
-    networkSelect: document.getElementById('network-select'),
-    transactionStatusText: document.getElementById('transaction-status'),
-};
+// --- Variables Globales para el Gráfico ---
+let chart;
+let candlestickSeries;
+let volumeSeries;
+let chartLoadingOverlay; // Para el overlay de carga del gráfico
 
-// --- Utility Functions ---
+// --- Precios (para conversión fiat) ---
+let solPriceUsd = 0; // Se actualizará al obtener datos del gráfico o por CoinGecko
 
-/**
- * Detecta y retorna los proveedores de billetera disponibles en el navegador.
- * @returns {Object} Objeto con posibles proveedores: solanaNative (array), metamask, otherEVM.
- */
-const detectWalletProviders = () => {
-    const providers = {
-        solanaNative: [], // Ahora un array para múltiples billeteras Solana
-        metamask: undefined,
-        otherEVM: undefined
-    };
+// --- Funciones de Utilidad ---
 
-    if (typeof window.solana !== 'undefined') {
-        if (window.solana.isPhantom) {
-            console.log('Phantom Wallet detectada.');
-            providers.solanaNative.push({ name: 'Phantom', provider: window.solana });
-        }
-        if (window.solana.isSolflare) {
-            console.log('Solflare Wallet detectada.');
-            providers.solanaNative.push({ name: 'Solflare', provider: window.solana });
-        }
-        if (window.solana.isBackpack) {
-            console.log('Backpack Wallet detectada.');
-            providers.solanaNative.push({ name: 'Backpack', provider: window.solana });
-        }
-        // Si hay una inyección de window.solana pero no es ninguna de las anteriores
-        if (providers.solanaNative.length === 0 && window.solana) {
-             console.log('Otra billetera Solana (window.solana compatible) detectada.');
-             providers.solanaNative.push({ name: 'Solana Wallet (Genérica)', provider: window.solana });
-        }
-    }
+// Función para mostrar mensajes de estado
+function showStatus(message, type = 'info') {
+    transactionStatusElem.innerHTML = message; // Usar innerHTML para enlaces
+    transactionStatusElem.className = `transaction-status status-${type}`;
+    transactionStatusElem.style.display = 'block';
+}
 
-    if (typeof window.ethereum !== 'undefined') {
-        if (window.ethereum.isMetaMask) {
-            console.log('MetaMask detectada.');
-            providers.metamask = window.ethereum;
-        } else {
-            console.log('Otra billetera EVM (no MetaMask) detectada.');
-            providers.otherEVM = window.ethereum;
-        }
-    }
-    return providers;
-};
+// Limpiar errores de validación
+function clearValidationErrors() {
+    recipientAddressError.textContent = '';
+    sendAmountError.textContent = '';
+}
 
-/**
- * Actualiza la interfaz de usuario según el estado de conexión de la billetera.
- */
-const updateUI = () => {
-    const { connectButton, disconnectButton, walletAddressText, walletMessageText, walletBalanceText, copyAddressButton, transferSection } = elements;
+// Formatear direcciones para visualización
+function formatAddress(address) {
+    if (!address) return 'No conectada';
+    const addr = address.toString();
+    return `${addr.substring(0, 4)}...${addr.substring(addr.length - 4)}`;
+}
 
-    // Resetear mensajes y estilos
-    walletMessageText.className = 'message-text';
-    walletAddressText.textContent = 'Estado: Desconectado';
-    walletBalanceText.textContent = ''; // Limpiar saldo
-    walletBalanceText.classList.remove('balance-display-large');
-    copyAddressButton.classList.add('hidden'); // Ocultar botón de copiar por defecto
-    connectButton.style.display = 'block';
-    disconnectButton.classList.add('hidden');
-    connectButton.disabled = false;
-    transferSection.classList.add('hidden');
+// --- Lógica de Conexión de Billetera ---
 
-    if (walletState.publicKey) {
-        // Estado: Billetera conectada y clave pública disponible
-        walletAddressText.textContent = `Conectado: ${walletState.publicKey.toBase58()}`;
-        walletMessageText.textContent = '';
-        copyAddressButton.classList.remove('hidden'); // Mostrar botón de copiar
-        connectButton.style.display = 'none';
-        disconnectButton.classList.remove('hidden');
-        transferSection.classList.remove('hidden');
-        walletBalanceText.classList.add('balance-display-large');
-        fetchBalance();
-    } else {
-        // Estado: No hay billetera conectada
-        const detected = detectWalletProviders();
-        let message = 'No se ha conectado una billetera Solana. Haz clic en "Conectar Billetera".';
-        let buttonText = 'Conectar Billetera';
-        let disableButton = false;
-
-        if (detected.solanaNative.length > 0 || detected.metamask) {
-            message = 'Selecciona una billetera para conectar.';
-            if (detected.solanaNative.length > 0 && detected.metamask) {
-                buttonText = 'Elegir Billetera';
-            } else if (detected.solanaNative.length > 0) {
-                buttonText = `Conectar ${detected.solanaNative[0].name}`;
-            } else if (detected.metamask) {
-                buttonText = 'Conectar MetaMask';
+async function connectWallet(walletName) {
+    try {
+        if (walletName === 'phantom') {
+            if (window.phantom?.solana?.isPhantom) {
+                provider = window.phantom.solana;
+            } else {
+                showStatus('Phantom no encontrado. Instala la extensión.', 'error');
+                window.open('https://phantom.app/', '_blank');
+                return;
             }
-        } else {
-            disableButton = true;
-            message = 'No se detectó ninguna billetera compatible. Instala Phantom, Solflare o MetaMask.';
+        } else if (walletName === 'solflare') {
+            if (window.solflare?.isSolflare) {
+                provider = window.solflare;
+            } else {
+                showStatus('Solflare no encontrado. Instala la extensión.', 'error');
+                window.open('https://solflare.com/', '_blank');
+                return;
+            }
         }
 
-        walletAddressText.textContent = 'Estado: Desconectado';
-        walletMessageText.textContent = message;
-        connectButton.textContent = buttonText;
-        connectButton.disabled = disableButton;
+        if (provider) {
+            const resp = await provider.connect();
+            publicKey = resp.publicKey;
+            statusMessage.textContent = 'Billetera conectada exitosamente.';
+            walletAddressElem.textContent = formatAddress(publicKey);
+            disconnectWalletBtn.style.display = 'block';
+            connectPhantomBtn.style.display = 'none';
+            connectSolflareBtn.style.display = 'none';
+            await updateBalance();
+            // await loadTransactionHistory(); // Descomentar cuando implementes el historial real
+            clearValidationErrors(); // Limpiar errores al conectar
+        } else {
+            showStatus('Proveedor de billetera no encontrado.', 'error');
+        }
+    } catch (err) {
+        console.error("Error al conectar la billetera:", err);
+        showStatus(`Error al conectar: ${err.message || 'Desconocido'}`, 'error');
     }
-    elements.transactionStatusText.textContent = '';
-    elements.transactionStatusText.className = 'transaction-status';
-};
+}
 
-/**
- * Muestra un mensaje de estado de transacción con color.
- * @param {string} message - El mensaje a mostrar.
- * @param {string} type - Tipo de mensaje: 'info', 'success', 'error'.
- */
-const setTransactionStatus = (message, type = 'info') => {
-    elements.transactionStatusText.textContent = message;
-    elements.transactionStatusText.className = `transaction-status text-${type}`;
-};
+async function disconnectWallet() {
+    try {
+        if (provider && publicKey) {
+            await provider.disconnect();
+            publicKey = null;
+            provider = null;
+            statusMessage.textContent = 'Billetera desconectada.';
+            walletAddressElem.textContent = 'No conectada';
+            solBalanceElem.textContent = '0.00 SOL';
+            fiatBalanceElem.textContent = '~$0.00 USD';
+            disconnectWalletBtn.style.display = 'none';
+            connectPhantomBtn.style.display = 'block';
+            connectSolflareBtn.style.display = 'block';
+            transactionStatusElem.style.display = 'none';
+            transactionHistoryElem.innerHTML = '<p class="text-secondary">Conecta tu billetera para ver el historial.</p>';
+        }
+    } catch (err) {
+        console.error("Error al desconectar:", err);
+        showStatus(`Error al desconectar: ${err.message || 'Desconocido'}`, 'error');
+    }
+}
 
-/**
- * Obtiene y muestra el balance de SOL de la billetera conectada.
- */
-const fetchBalance = async () => {
-    const { publicKey } = walletState;
+async function updateBalance() {
     if (!publicKey) {
-        elements.walletBalanceText.textContent = '';
+        solBalanceElem.textContent = '0.00 SOL';
+        fiatBalanceElem.textContent = '~$0.00 USD';
         return;
     }
 
-    elements.walletBalanceText.textContent = 'Cargando saldo...';
     try {
-        const { Connection, LAMPORTS_PER_SOL } = solanaWeb3;
-        const network = elements.networkSelect.value;
-        const connection = new Connection(solanaWeb3.clusterApiUrl(network));
-
+        // Instanciar la conexión a Solana
+        const connection = new solanaWeb3.Connection(
+            solanaWeb3.clusterApiUrl('mainnet-beta'),
+            'confirmed'
+        );
         const balanceLamports = await connection.getBalance(publicKey);
-        const balanceSOL = balanceLamports / LAMPORTS_PER_SOL;
+        const balanceSOL = balanceLamports / solanaWeb3.LAMPORTS_PER_SOL;
+        solBalanceElem.textContent = `${balanceSOL.toFixed(4)} SOL`;
 
-        elements.walletBalanceText.textContent = `Saldo: ${balanceSOL.toFixed(4)} SOL`;
-    } catch (error) {
-        console.error('Error al obtener el saldo:', error);
-        elements.walletBalanceText.textContent = 'Error al cargar saldo.';
-    }
-};
-
-/**
- * Restablece el estado de la billetera a "desconectado".
- */
-const disconnectWallet = () => {
-    // Si hay un proveedor nativo y tiene método de desconexión (ej. Phantom), usarlo
-    if (walletState.provider && typeof walletState.provider.disconnect === 'function' && walletState.type === 'solana-native') {
-        try {
-            walletState.provider.disconnect();
-            console.log('Billetera nativa desconectada.');
-        } catch (error) {
-            console.error('Error al desconectar billetera nativa:', error);
-        }
-    }
-    // Para MetaMask, no hay un método de "desconexión" directo de Snap,
-    // simplemente limpiamos nuestro estado local.
-    walletState.type = 'none';
-    walletState.provider = undefined;
-    walletState.solanaSnapProvider = undefined;
-    walletState.publicKey = undefined;
-    updateUI(); // Actualizar la UI para reflejar el estado desconectado
-    setTransactionStatus('Billetera desconectada.', 'info');
-    console.log('Estado de la billetera limpiado.');
-};
-
-
-// --- Wallet Connection Logic ---
-
-/**
- * Conecta una billetera Solana nativa (Phantom, Solflare, etc.).
- * @param {Object} provider - El objeto del proveedor de la billetera.
- * @param {boolean} onlyIfTrusted - Si se debe intentar la conexión automática (true para auto-conexión, false para conexión manual).
- * @returns {boolean} True si la conexión fue exitosa, false en caso contrario.
- */
-const connectSolanaNative = async (provider, onlyIfTrusted = false) => {
-    try {
-        await provider.connect({ onlyIfTrusted });
-        if (provider.publicKey) {
-            walletState.type = 'solana-native';
-            walletState.provider = provider;
-            walletState.publicKey = provider.publicKey;
-            console.log(`Billetera Solana nativa conectada: ${provider.publicKey.toBase58()}`);
-            fetchBalance();
-            return true;
-        }
-        return false;
-    } catch (error) {
-        console.warn(`Falló la conexión ${onlyIfTrusted ? 'automática' : 'manual'} con billetera Solana nativa:`, error);
-        walletState.provider = undefined;
-        walletState.publicKey = undefined;
-        if (!onlyIfTrusted) { // Solo mostrar alert si es un intento de conexión manual
-            alert(`Error al conectar billetera Solana nativa: ${error.message}`);
-        }
-        return false;
-    }
-};
-
-/**
- * Conecta MetaMask e intenta instalar/conectar el Snap de Solana.
- * @param {Object} metamaskProvider - El objeto window.ethereum (MetaMask).
- * @returns {boolean} True si la conexión del Snap fue exitosa, false en caso contrario.
- */
-const connectMetaMaskWithSolanaSnap = async (metamaskProvider) => {
-    setTransactionStatus('Conectando MetaMask y Snap de Solana...', 'info');
-    try {
-        console.log('Solicitando cuentas EVM de MetaMask...');
-        await metamaskProvider.request({ method: 'eth_requestAccounts' });
-        console.log('MetaMask conectada (lado EVM).');
-
-        console.log(`Solicitando el Snap de Solana (${SOLFLARE_SNAP_ID})...`);
-        const snapResult = await metamaskProvider.request({
-            method: 'wallet_requestSnaps',
-            params: { [SOLFLARE_SNAP_ID]: {} }
-        });
-
-        if (!snapResult[SOLFLARE_SNAP_ID]) {
-            throw new Error('Solana Snap no fue aprobado o instalado.');
+        if (solPriceUsd > 0) {
+            fiatBalanceElem.textContent = `~$${(balanceSOL * solPriceUsd).toFixed(2)} USD`;
+        } else {
+            fiatBalanceElem.textContent = `Cargando precio...`;
         }
 
-        console.log('Invocando método de conexión del Solana Snap...');
-        const solanaSnapPublicKey = await metamaskProvider.request({
-            method: 'wallet_invokeSnap',
-            params: {
-                snapId: SOLFLARE_SNAP_ID,
-                request: { method: 'solana_connect' }
-            }
-        });
-
-        if (!solanaSnapPublicKey || !solanaSnapPublicKey.publicKey) {
-            throw new Error('El Snap de Solana no devolvió una clave pública.');
-        }
-
-        const publicKey = new solanaWeb3.PublicKey(solanaSnapPublicKey.publicKey);
-
-        // Crear un objeto proveedor proxy para el Snap de Solana
-        walletState.solanaSnapProvider = {
-            publicKey: publicKey,
-            signTransaction: async (transaction) => {
-                console.log('Firmando transacción con Solana Snap...');
-                // Convertir la transacción a un formato serializable para el Snap
-                const { signature } = await metamaskProvider.request({
-                    method: 'wallet_invokeSnap',
-                    params: {
-                        snapId: SOLFLARE_SNAP_ID,
-                        request: {
-                            method: 'solana_signTransaction',
-                            params: {
-                                // Serializar la transacción y convertir a Array para pasar por JSON RPC
-                                transaction: Array.from(transaction.serialize({ requireAllSignatures: false }))
-                            }
-                        }
-                    }
-                });
-                // Añadir la firma a la transacción original
-                transaction.addSignature(publicKey, Buffer.from(signature, 'base64'));
-                return transaction;
-            },
-            signMessage: async (message) => {
-                console.log('Firmando mensaje con Solana Snap...');
-                const { signature } = await metamaskProvider.request({
-                    method: 'wallet_invokeSnap',
-                    params: {
-                        snapId: SOLFLARE_SNAP_ID,
-                        request: {
-                            method: 'solana_signMessage',
-                            params: { message: Buffer.from(message).toString('base64') }
-                        }
-                    }
-                });
-                return Buffer.from(signature, 'base64');
-            }
-        };
-
-        walletState.type = 'metamask';
-        walletState.provider = metamaskProvider; // El proveedor EVM de MetaMask (window.ethereum)
-        walletState.publicKey = publicKey; // La clave pública del Snap de Solana
-        console.log('MetaMask conectada y Solana Snap listo.');
-        setTransactionStatus('MetaMask conectada con Solana Snap.', 'success');
-        fetchBalance();
-        return true;
-    } catch (error) {
-        console.error('Error al conectar MetaMask con Solana Snap:', error);
-        setTransactionStatus(`Error al conectar MetaMask con Solana Snap: ${error.message}`, 'error');
-        alert(`Error al conectar MetaMask con Solana Snap. Asegúrate de tener MetaMask instalada y el Solflare Snap aprobado. Detalles: ${error.message}`);
-        walletState.type = 'none'; // Revertir a none si falla la conexión del Snap
-        walletState.solanaSnapProvider = undefined;
-        walletState.publicKey = undefined;
-        return false;
-    } finally {
-        updateUI(); // Asegurarse de actualizar la UI al final
+    } catch (err) {
+        console.error("Error al obtener balance:", err);
+        showStatus(`Error al cargar balance: ${err.message || 'Desconocido'}`, 'error');
     }
-};
+}
 
-/**
- * Función que maneja el proceso de conexión de billetera (llamada desde el botón).
- */
-const connectWallet = async () => {
-    elements.connectButton.disabled = true;
-    setTransactionStatus('Preparando conexión...', 'info');
+// --- Lógica de Envío de SOL ---
 
-    const { solanaNative, metamask } = detectWalletProviders();
-    let connected = false;
+async function sendSol() {
+    clearValidationErrors();
+    transactionStatusElem.style.display = 'none';
 
-    // Crear la lista de opciones para el usuario
-    let walletOptions = [];
-    solanaNative.forEach(w => walletOptions.push({ name: w.name, type: 'solana-native', provider: w.provider }));
-    if (metamask) {
-        walletOptions.push({ name: 'MetaMask', type: 'metamask', provider: metamask });
-    }
-
-    if (walletOptions.length === 0) {
-        setTransactionStatus('No se detectó ninguna billetera Solana compatible.', 'error');
-        alert('No se detectó ninguna billetera Solana compatible (Phantom, Solflare, MetaMask).');
-        updateUI();
+    if (!publicKey || !provider) {
+        showStatus('Por favor, conecta tu billetera primero.', 'warning');
         return;
     }
 
-    let choice = null;
-    if (walletOptions.length === 1) {
-        choice = 1; // Si solo hay una opción, la seleccionamos automáticamente
-        console.log(`Conectando automáticamente con la única opción: ${walletOptions[0].name}`);
-    } else {
-        // Si hay múltiples opciones, pedimos al usuario que elija
-        let promptMessage = "Múltiples billeteras detectadas. Elige una opción para conectar:\n\n";
-        walletOptions.forEach((option, index) => {
-            promptMessage += `${index + 1}. ${option.name} (${option.type === 'metamask' ? 'con Solana Snap' : 'Nativa Solana'})\n`;
-        });
-        promptMessage += `\nIntroduce el número de tu elección:`;
+    const recipientAddress = recipientAddressInput.value.trim();
+    const sendAmount = parseFloat(sendAmountInput.value);
 
-        const rawChoice = prompt(promptMessage);
-        choice = parseInt(rawChoice);
+    let isValid = true;
 
-        if (isNaN(choice) || choice < 1 || choice > walletOptions.length) {
-            alert('Elección inválida o conexión cancelada.');
-            setTransactionStatus('Conexión cancelada o elección inválida.', 'error');
-            updateUI();
-            return;
-        }
+    // Validar dirección
+    try {
+        new solanaWeb3.PublicKey(recipientAddress);
+    } catch (e) {
+        recipientAddressError.textContent = 'Dirección de destinatario inválida.';
+        isValid = false;
     }
 
-    const selectedWallet = walletOptions[choice - 1];
-
-    if (selectedWallet.type === 'metamask') {
-        connected = await connectMetaMaskWithSolanaSnap(selectedWallet.provider);
-    } else { // 'solana-native'
-        connected = await connectSolanaNative(selectedWallet.provider);
+    // Validar cantidad
+    if (isNaN(sendAmount) || sendAmount <= 0) {
+        sendAmountError.textContent = 'Ingresa una cantidad válida para enviar.';
+        isValid = false;
     }
 
-    if (connected) {
-        setTransactionStatus('Billetera conectada exitosamente.', 'success');
-    } else {
-        // El mensaje de error ya se estableció en las funciones de conexión
-    }
-    updateUI();
-};
-
-/**
- * Función que maneja el envío de SOL.
- */
-const sendSol = async () => {
-    setTransactionStatus('Procesando transacción...', 'info');
-    elements.transferButton.disabled = true;
-
-    const payerPublicKey = walletState.publicKey;
-    // El proveedor para firmar será el solanaSnapProvider si MetaMask está en uso, de lo contrario, el provider nativo
-    const signerProvider = walletState.solanaSnapProvider || walletState.provider;
-
-    if (!payerPublicKey || !signerProvider) {
-        setTransactionStatus('Error: Ninguna billetera Solana compatible conectada o no hay clave pública disponible.', 'error');
-        elements.transferButton.disabled = false;
+    if (!isValid) {
         return;
     }
 
-    const recipientAddress = elements.recipientAddressInput.value.trim();
-    const amountSOL = parseFloat(elements.amountSolInput.value);
-    const network = elements.networkSelect.value;
-
-    if (!recipientAddress || isNaN(amountSOL) || amountSOL <= 0) {
-        setTransactionStatus('Por favor, introduce una dirección de destinatario válida y una cantidad mayor a cero.', 'error');
-        elements.transferButton.disabled = false;
-        return;
-    }
+    sendSolBtn.disabled = true;
+    sendSolSpinner.style.display = 'inline-block';
+    showStatus('Enviando transacción...', 'info');
 
     try {
-        const { Connection, PublicKey, Transaction, SystemProgram, LAMPORTS_PER_SOL } = solanaWeb3;
+        const connection = new solanaWeb3.Connection(
+            solanaWeb3.clusterApiUrl('mainnet-beta'),
+            'confirmed'
+        );
 
-        let toPublicKey;
-        try {
-            toPublicKey = new PublicKey(recipientAddress);
-        } catch (e) {
-            setTransactionStatus('La dirección del destinatario no es una dirección Solana válida.', 'error');
-            elements.transferButton.disabled = false;
-            return;
-        }
+        const lamportsToSend = sendAmount * solanaWeb3.LAMPORTS_PER_SOL;
 
-        const connection = new Connection(solanaWeb3.clusterApiUrl(network));
-        const lamports = amountSOL * LAMPORTS_PER_SOL;
-
-        // Verificar saldo antes de enviar (opcional, pero buena práctica)
-        const balanceLamports = await connection.getBalance(payerPublicKey);
-        if (balanceLamports < lamports) {
-            setTransactionStatus('Fondos insuficientes en la billetera para esta transacción.', 'error');
-            elements.transferButton.disabled = false;
-            return;
-        }
-
-        const transaction = new Transaction().add(
-            SystemProgram.transfer({
-                fromPubkey: payerPublicKey,
-                toPubkey: toPublicKey,
-                lamports: lamports,
+        const transaction = new solanaWeb3.Transaction().add(
+            solanaWeb3.SystemProgram.transfer({
+                fromPubkey: publicKey,
+                toPubkey: new solanaWeb3.PublicKey(recipientAddress),
+                lamports: lamportsToSend,
             })
         );
 
-        transaction.feePayer = payerPublicKey; // Establecer al pagador de la tarifa
-        const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash('finalized');
+        // Obtener el blockhash reciente
+        const { blockhash } = await connection.getLatestBlockhash('finalized');
         transaction.recentBlockhash = blockhash;
+        transaction.feePayer = publicKey;
 
-        // La billetera conectada firmará la transacción
-        const signedTransaction = await signerProvider.signTransaction(transaction);
-
-        // Enviar la transacción firmada
+        const signedTransaction = await provider.signTransaction(transaction);
         const signature = await connection.sendRawTransaction(signedTransaction.serialize());
 
-        setTransactionStatus(`Transacción enviada. Esperando confirmación... Firma: ${signature.substring(0, 10)}...`, 'info');
-        console.log(`Transacción enviada: ${signature}`);
+        showStatus(`Transacción enviada. Confirmando...`);
+        await connection.confirmTransaction({ signature, blockhash }, 'finalized');
 
-        // Esperar confirmación
-        await connection.confirmTransaction({
-            signature: signature,
-            blockhash: blockhash,
-            lastValidBlockHeight: lastValidBlockHeight
-        }, 'confirmed'); // 'confirmed' es suficiente para la mayoría de los casos
+        showStatus(`Transacción confirmada: <a href="https://solscan.io/tx/${signature}" target="_blank" style="color: inherit; text-decoration: underline;">Ver en Solscan</a>`, 'success');
+        
+        // Limpiar campos y actualizar balance
+        recipientAddressInput.value = '';
+        sendAmountInput.value = '';
+        await updateBalance();
 
-        setTransactionStatus(`¡Transacción exitosa! Firma: ${signature}`, 'success');
-        console.log('Transacción exitosa:', signature);
-        fetchBalance(); // Actualizar el saldo después de la transacción
-
-    } catch (error) {
-        console.error('Error al transferir SOL:', error);
-        let errorMessage = error.message;
-        if (error.code === 4001) {
-            errorMessage = 'Transacción rechazada por el usuario en la billetera.';
-        } else if (error.message && error.message.includes('insufficient funds')) {
-             errorMessage = 'Fondos insuficientes en la billetera para la transacción.';
-        } else if (error.message && error.message.includes('invalid public key')) {
-             errorMessage = 'La dirección del destinatario no es una dirección Solana válida.';
+    } catch (err) {
+        console.error("Error al enviar SOL:", err);
+        let errorMessage = `Error de transacción: ${err.message || 'Desconocido'}.`;
+        if (err.message && err.message.includes('insufficient funds')) {
+            errorMessage = 'Fondos insuficientes. Recarga tu billetera.';
+        } else if (err.code === 4001 || err.message === 'User rejected the request.') {
+             errorMessage = 'Transacción cancelada por el usuario.';
         }
-        setTransactionStatus(`Error en la transacción: ${errorMessage}`, 'error');
+        showStatus(errorMessage, 'error');
     } finally {
-        elements.transferButton.disabled = false;
+        sendSolBtn.disabled = false;
+        sendSolSpinner.style.display = 'none';
     }
-};
+}
 
-/**
- * Función que maneja el cambio de red (actualiza el balance si está conectada).
- */
-const updateConnection = () => {
-    if (walletState.publicKey) {
-        fetchBalance(); // Recargar el saldo cuando la red cambia
+// --- Lógica de Conversión Fiat ---
+
+// Función para actualizar el precio actual de SOL
+async function fetchCurrentSolPrice() {
+    try {
+        const response = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd');
+        const data = await response.json();
+        if (data && data.solana && data.solana.usd) {
+            solPriceUsd = data.solana.usd;
+            updateBalance(); // Actualiza el balance en fiat con el nuevo precio
+        }
+    } catch (error) {
+        console.error('Error fetching current SOL price:', error);
+        // Si falla, se mantiene el precio anterior o 0
     }
-};
+}
 
+function convertFiatToCrypto() {
+    if (solPriceUsd === 0) {
+        cryptoAmountInput.value = 'Cargando precio...';
+        return;
+    }
+    const fiatVal = parseFloat(fiatAmountInput.value);
+    if (!isNaN(fiatVal) && fiatVal > 0) {
+        cryptoAmountInput.value = (fiatVal / solPriceUsd).toFixed(6);
+    } else {
+        cryptoAmountInput.value = '';
+    }
+}
+
+function convertCryptoToFiat() {
+    if (solPriceUsd === 0) {
+        fiatAmountInput.value = 'Cargando precio...';
+        return;
+    }
+    const cryptoVal = parseFloat(cryptoAmountInput.value);
+    if (!isNaN(cryptoVal) && cryptoVal > 0) {
+        fiatAmountInput.value = (cryptoVal * solPriceUsd).toFixed(2);
+    } else {
+        fiatAmountInput.value = '';
+    }
+}
+
+// --- Lógica de Gráfico de Precios (Lightweight Charts + CoinGecko) ---
+
+// Función para obtener datos históricos de CoinGecko
+async function fetchChartDataFromCoinGecko(days) {
+    const coingeckoId = 'solana'; // ID de Solana en CoinGecko
+    const currency = 'usd'; // Moneda base
+    
+    // Usamos el endpoint ohlc para datos de velas
+    const urlOhlc = `https://api.coingecko.com/api/v3/coins/${coingeckoId}/ohlc?vs_currency=${currency}&days=${days}`;
+    // Y el endpoint market_chart para datos de volumen (el ohlc no lo incluye)
+    const urlMarketChart = `https://api.coingecko.com/api/v3/coins/${coingeckoId}/market_chart?vs_currency=${currency}&days=${days}`;
+
+    try {
+        chartLoadingOverlay.style.display = 'flex'; // Mostrar overlay de carga
+
+        const [ohlcResponse, marketChartResponse] = await Promise.all([
+            fetch(urlOhlc),
+            fetch(urlMarketChart)
+        ]);
+
+        const ohlcData = await ohlcResponse.json();
+        const marketChartData = await marketChartResponse.json();
+
+        // Formatear datos OHLC para Lightweight Charts (time en segundos, OHLC)
+        const formattedCandleData = ohlcData.map(item => ({
+            time: item[0] / 1000, // Timestamp en ms a segundos
+            open: item[1],
+            high: item[2],
+            low: item[3],
+            close: item[4],
+        }));
+        
+        // Formatear datos de volumen
+        // market_chart.total_volumes tiene [timestamp_ms, volume]
+        const formattedVolumeData = marketChartData.total_volumes.map(item => ({
+            time: item[0] / 1000, // Timestamp en ms a segundos
+            value: item[1],
+            // Determinar color basado en si la vela de ese tiempo fue alcista o bajista
+            // Esto requiere encontrar la vela correspondiente para ese tiempo
+            color: (formattedCandleData.find(c => c.time === item[0] / 1000)?.open < formattedCandleData.find(c => c.time === item[0] / 1000)?.close ? getComputedStyle(document.body).getPropertyValue('--accent-main') : getComputedStyle(document.body).getPropertyValue('--error-color')) + '30'
+        }));
+        
+        chartLoadingOverlay.style.display = 'none'; // Ocultar overlay de carga
+        return { candles: formattedCandleData, volume: formattedVolumeData };
+        
+    } catch (error) {
+        console.error('Error fetching chart data from CoinGecko:', error);
+        chartLoadingOverlay.style.display = 'none'; // Ocultar overlay
+        showStatus('Error al cargar datos del gráfico.', 'error');
+        return { candles: [], volume: [] }; // Retorna arrays vacíos en caso de error
+    }
+}
+
+
+function initializeChart() {
+    const chartElement = document.getElementById('sol-price-chart');
+    if (!chartElement) return;
+
+    // LightweightCharts es global porque se carga vía CDN en index.html
+    chartLoadingOverlay = document.getElementById('chart-loading-overlay'); // Asigna el overlay
+
+    // Limpiar gráfico si ya existe para evitar duplicados al recargar
+    if (chart) {
+        chart.remove();
+    }
+
+    chart = LightweightCharts.create(chartElement, {
+        width: chartElement.clientWidth,
+        height: chartElement.clientHeight,
+        layout: {
+            background: { type: 'solid', color: getComputedStyle(document.body).getPropertyValue('--input-bg') },
+            textColor: getComputedStyle(document.body).getPropertyValue('--text-secondary'),
+        },
+        grid: {
+            vertLines: { color: getComputedStyle(document.body).getPropertyValue('--border-color') + '20' },
+            horzLines: { color: getComputedStyle(document.body).getPropertyValue('--border-color') + '20' },
+        },
+        timeScale: {
+            borderColor: getComputedStyle(document.body).getPropertyValue('--border-color'),
+        },
+        priceScale: {
+            borderColor: getComputedStyle(document.body).getPropertyValue('--border-color'),
+        },
+        crosshair: {
+            mode: LightweightCharts.CrosshairMode.Normal,
+        },
+        watermark: {
+            visible: true,
+            fontSize: 48,
+            horzAlign: 'center',
+            vertAlign: 'center',
+            color: getComputedStyle(document.body).getPropertyValue('--border-color') + '40',
+            text: 'QuickSOL',
+        }
+    });
+
+    candlestickSeries = chart.addCandlestickSeries({
+        upColor: getComputedStyle(document.body).getPropertyValue('--accent-main'),
+        downColor: getComputedStyle(document.body).getPropertyValue('--error-color'),
+        borderVisible: false,
+        wickUpColor: getComputedStyle(document.body).getPropertyValue('--accent-main'),
+        wickDownColor: getComputedStyle(document.body).getPropertyValue('--error-color'),
+    });
+
+    volumeSeries = chart.addHistogramSeries({
+        color: getComputedStyle(document.body).getPropertyValue('--accent-main') + '30', // Color base, se ajusta por dato
+        priceFormat: {
+            type: 'volume',
+        },
+        overlay: true,
+        scaleMargins: {
+            top: 0.8,
+            bottom: 0,
+        },
+    });
+
+    // Manejar el redimensionamiento
+    new ResizeObserver(entries => {
+        if (entries.length === 0 || entries[0].target.id !== 'sol-price-chart') return;
+        const { width, height } = entries[0].contentRect;
+        chart.resize(width, height);
+    }).observe(chartElement);
+
+    loadChartData(1); // Cargar datos de 1 día inicialmente
+}
+
+async function loadChartData(days) {
+    chartLoadingOverlay.style.display = 'flex'; // Mostrar overlay de carga
+    const { candles, volume } = await fetchChartDataFromCoinGecko(days);
+    
+    candlestickSeries.setData(candles);
+    volumeSeries.setData(volume); // Setear datos de volumen
+    chartLoadingOverlay.style.display = 'none'; // Ocultar overlay de carga
+}
+
+// --- Lógica de Tema ---
+function applyTheme(theme) {
+    document.body.classList.remove('light-theme', 'dark-theme');
+    document.body.classList.add(theme);
+    localStorage.setItem('theme', theme);
+
+    // Actualizar icono del toggle
+    if (theme === 'dark-theme') {
+        themeToggleBtn.innerHTML = '<i class="fas fa-sun"></i>'; // Icono de sol para ir al tema claro
+    } else {
+        themeToggleBtn.innerHTML = '<i class="fas fa-moon"></i>'; // Icono de luna para ir al tema oscuro
+    }
+
+    // Actualizar colores del gráfico si el gráfico ya existe
+    if (chart) {
+        chart.applyOptions({
+            layout: {
+                background: { type: 'solid', color: getComputedStyle(document.body).getPropertyValue('--input-bg') },
+                textColor: getComputedStyle(document.body).getPropertyValue('--text-secondary'),
+            },
+            grid: {
+                vertLines: { color: getComputedStyle(document.body).getPropertyValue('--border-color') + '20' },
+                horzLines: { color: getComputedStyle(document.body).getPropertyValue('--border-color') + '20' },
+            },
+            timeScale: {
+                borderColor: getComputedStyle(document.body).getPropertyValue('--border-color'),
+            },
+            priceScale: {
+                borderColor: getComputedStyle(document.body).getPropertyValue('--border-color'),
+            },
+            watermark: {
+                color: getComputedStyle(document.body).getPropertyValue('--border-color') + '40',
+            }
+        });
+        candlestickSeries.applyOptions({
+            upColor: getComputedStyle(document.body).getPropertyValue('--accent-main'),
+            downColor: getComputedStyle(document.body).getPropertyValue('--error-color'),
+            wickUpColor: getComputedStyle(document.body).getPropertyValue('--accent-main'),
+            wickDownColor: getComputedStyle(document.body).getPropertyValue('--error-color'),
+        });
+        // Re-aplicar datos para que el volumen se pinte con los colores correctos si cambian
+        // lightweight-charts puede manejar esto si pasamos los datos con los colores ya definidos en 'volumeData'
+        const currentActiveTimeframe = document.querySelector('.btn-chart-timeframe.active')?.dataset.timeframe || '1';
+        loadChartData(parseInt(currentActiveTimeframe));
+    }
+}
 
 // --- Event Listeners ---
+document.addEventListener('DOMContentLoaded', async () => {
+    // Cargar tema guardado o aplicar oscuro por defecto
+    const savedTheme = localStorage.getItem('theme') || 'dark-theme';
+    applyTheme(savedTheme);
 
-// Lógica de carga inicial para intentar conexión automática
-window.addEventListener('load', async () => {
-    const { solanaNative } = detectWalletProviders();
+    connectPhantomBtn.addEventListener('click', () => connectWallet('phantom'));
+    connectSolflareBtn.addEventListener('click', () => connectWallet('solflare'));
+    disconnectWalletBtn.addEventListener('click', disconnectWallet);
+    sendSolBtn.addEventListener('click', sendSol);
 
-    if (solanaNative.length > 0) {
-        // Intentar conexión automática con la primera billetera Solana nativa detectada
-        console.log(`Intentando conexión automática con ${solanaNative[0].name}...`);
-        await connectSolanaNative(solanaNative[0].provider, true); // true para onlyIfTrusted
-    }
-    updateUI(); // Actualizar la UI después del intento de conexión inicial
-});
+    fiatAmountInput.addEventListener('input', convertFiatToCrypto);
+    cryptoAmountInput.addEventListener('input', convertCryptoToFiat);
 
-elements.connectButton.addEventListener('click', connectWallet);
-elements.disconnectButton.addEventListener('click', disconnectWallet);
-elements.transferButton.addEventListener('click', sendSol);
-elements.networkSelect.addEventListener('change', updateConnection);
+    // Inicializar el gráfico y los datos de precio
+    initializeChart();
+    await fetchCurrentSolPrice(); // Obtener el precio actual de SOL para el conversor y balance
+    setInterval(fetchCurrentSolPrice, 60000); // Actualizar precio cada minuto
 
-elements.copyAddressButton.addEventListener('click', async () => {
-    if (walletState.publicKey) {
-        try {
-            await navigator.clipboard.writeText(walletState.publicKey.toBase58());
-            elements.walletMessageText.textContent = '¡Dirección copiada al portapapeles!';
-            elements.walletMessageText.className = 'message-text text-success'; // Usar clase de éxito
-            setTimeout(() => {
-                elements.walletMessageText.textContent = '';
-                elements.walletMessageText.className = 'message-text';
-            }, 3000); // Borrar mensaje después de 3 segundos
-        } catch (err) {
-            console.error('Error al copiar la dirección:', err);
-            elements.walletMessageText.textContent = 'Error al copiar la dirección.';
-            elements.walletMessageText.className = 'message-text text-error'; // Usar clase de error
-        }
-    }
-});
+    // Event listeners para botones de marco de tiempo del gráfico
+    const timeframeButtons = document.querySelectorAll('.btn-chart-timeframe');
+    timeframeButtons.forEach(button => {
+        button.addEventListener('click', () => {
+            timeframeButtons.forEach(btn => btn.classList.remove('active'));
+            button.classList.add('active');
+            loadChartData(parseInt(
