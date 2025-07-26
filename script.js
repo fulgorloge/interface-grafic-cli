@@ -200,7 +200,6 @@ const connectMetaMaskWithSolanaSnap = async (metamaskProvider) => {
                         }
                     }
                 });
-                // Buffer.from es lo que causaba el error si el polyfill no estaba correctamente configurado
                 transaction.addSignature(publicKey, Buffer.from(signature, 'base64'));
                 return transaction;
             },
@@ -246,11 +245,13 @@ window.addEventListener('load', async () => {
     const { solanaNative, metamask } = detectWalletProviders();
 
     if (solanaNative) {
-        await connectSolanaNative(solanaNative, true); // Intentar conexión silenciosa
+        // Solo intentar conexión automática con billeteras nativas.
+        // MetaMask con Snap requiere interacción explícita (aunque la UI la preparamos).
+        await connectSolanaNative(solanaNative, true);
     } else if (metamask) {
+        // Si solo se detecta MetaMask, preparamos el estado para que la UI pida conectar Snap.
         walletState.type = 'metamask';
         walletState.provider = metamask;
-        // Para MetaMask, la conexión del Snap no es automática al cargar, se hace con el botón
     }
     updateUI();
 });
@@ -263,11 +264,23 @@ elements.connectButton.addEventListener('click', async () => {
     const { solanaNative, metamask } = detectWalletProviders();
     let connected = false;
 
-    if (solanaNative) {
+    // Si ambos están disponibles, preguntar al usuario
+    if (solanaNative && metamask) {
+        const choice = confirm("¿Qué billetera deseas conectar?\n\nAceptar para Phantom/Solflare (Nativa Solana)\nCancelar para MetaMask (con Solana Snap)");
+
+        if (choice) { // Usuario eligió Phantom/Solflare
+            connected = await connectSolanaNative(solanaNative);
+        } else { // Usuario eligió MetaMask
+            connected = await connectMetaMaskWithSolanaSnap(metamask);
+        }
+    } else if (solanaNative) {
+        // Solo Phantom/Solflare disponible
         connected = await connectSolanaNative(solanaNative);
     } else if (metamask) {
+        // Solo MetaMask disponible
         connected = await connectMetaMaskWithSolanaSnap(metamask);
     } else {
+        // Ninguna billetera compatible detectada
         setTransactionStatus('No se detectó ninguna billetera Solana compatible (Phantom, Solflare, MetaMask).', 'error');
         alert('No se detectó ninguna billetera Solana compatible (Phantom, Solflare, MetaMask).');
     }
@@ -286,7 +299,9 @@ elements.transferButton.addEventListener('click', async () => {
     elements.transferButton.disabled = true; // Deshabilitar botón durante la transacción
 
     const payerPublicKey = walletState.publicKey;
-    const signerProvider = walletState.solanaSnapProvider || walletState.provider; // Usar Snap provider si existe, sino el nativo
+    // Si walletState.solanaSnapProvider existe, úsalo, de lo contrario usa walletState.provider.
+    // Esto asegura que la firma se realice con el proveedor correcto (Snap o nativo).
+    const signerProvider = walletState.solanaSnapProvider || walletState.provider;
 
     if (!payerPublicKey || !signerProvider) {
         setTransactionStatus('Error: Ninguna billetera Solana compatible conectada o no hay clave pública disponible.', 'error');
@@ -332,7 +347,7 @@ elements.transferButton.addEventListener('click', async () => {
         transaction.feePayer = payerPublicKey;
         transaction.recentBlockhash = (await connection.getRecentBlockhash()).blockhash;
 
-        // Firma la transacción usando el proveedor correcto
+        // Firma la transacción usando el proveedor correcto (solanaSnapProvider o provider nativo)
         const signedTransaction = await signerProvider.signTransaction(transaction);
 
         // Envía la transacción firmada a la red Solana
