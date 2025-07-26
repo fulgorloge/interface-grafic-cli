@@ -18,6 +18,7 @@
 
         <section class="wallet-status">
             <p id="wallet-address" class="address-display">Estado: Desconectado</p>
+            <p id="wallet-balance" class="balance-display"></p> 
             <button id="connect-button" class="btn btn-primary">Conectar Billetera</button>
         </section>
 
@@ -50,12 +51,14 @@
         </footer>
     </div>
 
-    <script src="https://unpkg.com/buffer@6.0.3/index.js"></script>
+    <script src="https://bundle.run/buffer@6.0.3"></script>
     <script>
-        // Asegúrate de que 'Buffer' esté disponible globalmente como 'window.Buffer'
-        // Esto es necesario si la librería 'buffer' no lo expone automáticamente así.
-        if (typeof window.Buffer === 'undefined') {
-            window.Buffer = require('buffer').Buffer;
+        if (typeof window.Buffer === 'undefined' || typeof window.Buffer.from !== 'function') {
+            if (typeof Buffer !== 'undefined' && typeof Buffer.from === 'function') {
+                window.Buffer = Buffer;
+            } else {
+                console.warn("Advertencia: El polyfill de Buffer no se cargó correctamente. Puede haber problemas.");
+            }
         }
     </script>
 
