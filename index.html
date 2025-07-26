@@ -3,77 +3,115 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>QuickSOL</title> <link rel="preconnect" href="https://fonts.googleapis.com">
+    <title>QuickSOL - Tu Billetera Solana</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
 </head>
-<body>
+<body class="dark-theme"> <div class="theme-toggle-container">
+        <button id="theme-toggle" class="theme-toggle-btn">
+            <i class="fas fa-sun"></i> </button>
+    </div>
+
     <div class="container">
         <header class="app-header">
-            <h1><span class="highlight">Quick</span>SOL</h1> <p id="wallet-message" class="message-text"></p>
+            <h1>Quick<span class="highlight">SOL</span></h1>
+            <p class="message-text" id="status-message">Conecta tu billetera Solana para empezar.</p>
         </header>
 
-        <section class="wallet-status">
-            <p id="wallet-address" class="address-display">Estado: Desconectado</p>
-            <button id="copy-address-button" class="btn btn-icon hidden" title="Copiar dirección">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="icon-copy">
-                    <path d="M7.5 3.75A1.5 1.5 0 0 0 6 5.25v13.5a1.5 1.5 0 0 0 1.5 1.5h6a1.5 1.5 0 0 0 1.5-1.5V15a.75.75 0 0 1 1.5 0v3.75a3 3 0 0 1-3 3h-6a3 3 0 0 1-3-3V5.25a3 3 0 0 1 3-3h6a3 3 0 0 1 3 3V9A.75.75 0 0 1 15 9V5.25a1.5 1.5 0 0 0-1.5-1.5h-6Zm10.5 0a.75.75 0 0 0-1.5 0v4.5a.75.75 0 0 0 .75.75h4.5a.75.75 0 0 0 0-1.5h-3.75V3.75Z" />
-                    <path d="M4.5 9.75a.75.75 0 0 1 .75-.75h4.5a.75.75 0 0 1 0 1.5h-3.75v3.75a.75.75 0 0 1-1.5 0v-4.5Zm12-3a.75.75 0 0 1 .75-.75h.008v.008H16.5v-.008Z" />
-                </svg>
+        <div class="wallet-selection-container">
+            <button class="wallet-button" id="connect-phantom">
+                <img src="https://phantom.app/ul/phantom-icon.svg" alt="Phantom Icon">
+                <span>Phantom</span>
             </button>
-            <p id="wallet-balance" class="balance-display"></p> 
-            
-            <div class="button-group">
-                <button id="connect-button" class="btn btn-primary">Conectar Billetera</button>
-                <button id="disconnect-button" class="btn btn-secondary hidden">Desconectar Billetera</button> 
-            </div>
-        </section>
+            <button class="wallet-button" id="connect-solflare">
+                <img src="https://solflare.com/favicon.ico" alt="Solflare Icon">
+                <span>Solflare</span>
+            </button>
+            <button class="wallet-button" id="connect-ledger" disabled>
+                <img src="https://www.ledger.com/wp-content/uploads/2021/04/ledger_logo_rgb.png" alt="Ledger Icon">
+                <span>Ledger (próx.)</span>
+            </button>
+        </div>
+        
+        <div class="wallet-status">
+            <p class="address-display" id="wallet-address">No conectada</p>
+            <p class="balance-display-large" id="sol-balance">0.00 SOL</p>
+            <p class="text-secondary" id="fiat-balance">~$0.00 USD</p>
+            <button class="btn btn-secondary" id="disconnect-wallet" style="display: none;">Desconectar</button>
+        </div>
 
         <hr>
 
-        <section id="transfer-section" class="transfer-section hidden">
+        <div class="app-section">
             <h2>Enviar <span class="highlight">SOL</span></h2>
             <div class="form-group">
-                <label for="network-select">Red Solana:</label>
-                <select id="network-select" class="form-control">
-                    <option value="devnet">Devnet</option>
-                    <option value="testnet">Testnet</option>
-                    <option value="mainnet-beta">Mainnet Beta</option>
-                </select>
-            </div>
-            <div class="form-group">
                 <label for="recipient-address">Dirección del Destinatario:</label>
-                <input type="text" id="recipient-address" class="form-control" placeholder="Ej: 5wN...XYZ">
+                <input type="text" id="recipient-address" class="form-control" placeholder="Ej. 6g2...p9B" required>
+                <span class="validation-message" id="recipient-address-error"></span>
             </div>
             <div class="form-group">
-                <label for="amount-sol">Cantidad de SOL:</label>
-                <input type="number" id="amount-sol" class="form-control" step="0.0001" value="0.01">
+                <label for="send-amount">Cantidad (SOL):</label>
+                <input type="number" id="send-amount" class="form-control" placeholder="0.00" step="0.000001" required>
+                <span class="validation-message" id="send-amount-error"></span>
             </div>
-            <button id="transfer-button" class="btn btn-success">Enviar SOL</button>
-            <p id="transaction-status" class="transaction-status"></p>
-        </section>
+            <p id="estimated-fees">Tarifa estimada: **0.000005 SOL**</p>
+            <button class="btn btn-primary" id="send-sol-btn">
+                Enviar SOL 
+                <span class="spinner" id="send-sol-spinner" style="display: none;"></span>
+            </button>
+            <p class="transaction-status" id="transaction-status" style="display: none;"></p>
+        </div>
 
-        <footer class="app-footer">
-            <p>&copy; 2025 QuickSOL. Todos los derechos reservados.</p>
-        </footer>
-    </div>
+        <hr>
 
-    <script src="https://bundle.run/buffer@6.0.3"></script>
-    <script>
-        // Polyfill para Buffer si no está disponible (necesario para algunas operaciones de Solana)
-        if (typeof window.Buffer === 'undefined' || typeof window.Buffer.from !== 'function') {
-            if (typeof Buffer !== 'undefined' && typeof Buffer.from === 'function') {
-                window.Buffer = Buffer;
-            } else {
-                console.warn("Advertencia: El polyfill de Buffer no se cargó correctamente. Puede haber problemas.");
-            }
-        }
-    </script>
+        <div class="app-section">
+            <h2>Conversor <span class="highlight">Fiat</span></h2>
+            <div class="form-group">
+                <label for="fiat-amount">Cantidad (USD):</label>
+                <input type="number" id="fiat-amount" class="form-control" placeholder="100.00" step="0.01">
+            </div>
+            <div class="form-group">
+                <label for="crypto-amount">Cantidad (SOL):</label>
+                <input type="number" id="crypto-amount" class="form-control" placeholder="0.00" step="0.000001">
+            </div>
+            <p class="text-secondary">Precios actualizados por CoinGecko.</p>
+        </div>
 
-    <script src="https://unpkg.com/@solana/web3.js@1.91.0/lib/index.iife.min.js"></script>
+        <hr>
 
+        <div class="app-section" style="position: relative;">
+            <h2>Análisis del <span class="highlight">Precio de SOL</span></h2>
+            <div class="chart-controls">
+                <button class="btn btn-chart-timeframe active" data-timeframe="1">1 Día</button>
+                <button class="btn btn-chart-timeframe" data-timeframe="7">1 Semana</button>
+                <button class="btn btn-chart-timeframe" data-timeframe="30">1 Mes</button>
+                <button class="btn btn-chart-timeframe" data-timeframe="90">3 Meses</button>
+                <button class="btn btn-chart-timeframe" data-timeframe="365">1 Año</button>
+            </div>
+            <div id="sol-price-chart" class="price-chart">
+                 <div id="chart-loading-overlay" class="loading-overlay" style="display: flex;">
+                    <div class="spinner"></div>
+                </div>
+            </div>
+            <p class="chart-disclaimer">Datos de precios proporcionados por CoinGecko.</p>
+        </div>
+
+        <hr>
+
+        <div class="app-section">
+            <h2>Historial de <span class="highlight">Transacciones</span></h2>
+            <div id="transaction-history">
+                <p class="text-secondary">Conecta tu billetera para ver el historial.</p>
+                </div>
+        </div>
+        
+        </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@solana/web3.js@latest/lib/index.iife.min.js"></script>
+    <script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
     <script src="script.js"></script>
-
 </body>
 </html>
