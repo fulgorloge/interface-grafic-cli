@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Conexión y Transferencia Solana</title>
+    <title>QuickSOL</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -12,20 +12,30 @@
 <body>
     <div class="container">
         <header class="app-header">
-            <h1><span class="highlight">Solana</span> Wallet & Snap</h1>
+            <h1><span class="highlight">Quick</span>SOL</h1>
             <p id="wallet-message" class="message-text"></p>
         </header>
 
         <section class="wallet-status">
             <p id="wallet-address" class="address-display">Estado: Desconectado</p>
+            <button id="copy-address-button" class="btn btn-icon hidden" title="Copiar dirección">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="icon-copy">
+                    <path d="M7.5 3.75A1.5 1.5 0 0 0 6 5.25v13.5a1.5 1.5 0 0 0 1.5 1.5h6a1.5 1.5 0 0 0 1.5-1.5V15a.75.75 0 0 1 1.5 0v3.75a3 3 0 0 1-3 3h-6a3 3 0 0 1-3-3V5.25a3 3 0 0 1 3-3h6a3 3 0 0 1 3 3V9A.75.75 0 0 1 15 9V5.25a1.5 1.5 0 0 0-1.5-1.5h-6Zm10.5 0a.75.75 0 0 0-1.5 0v4.5a.75.75 0 0 0 .75.75h4.5a.75.75 0 0 0 0-1.5h-3.75V3.75Z" />
+                    <path d="M4.5 9.75a.75.75 0 0 1 .75-.75h4.5a.75.75 0 0 1 0 1.5h-3.75v3.75a.75.75 0 0 1-1.5 0v-4.5Zm12-3a.75.75 0 0 1 .75-.75h.008v.008H16.5v-.008Z" />
+                </svg>
+            </button>
             <p id="wallet-balance" class="balance-display"></p> 
-            <button id="connect-button" class="btn btn-primary">Conectar Billetera</button>
+            
+            <div class="button-group">
+                <button id="connect-button" class="btn btn-primary">Conectar Billetera</button>
+                <button id="disconnect-button" class="btn btn-secondary hidden">Desconectar Billetera</button> 
+            </div>
         </section>
 
         <hr>
 
         <section id="transfer-section" class="transfer-section hidden">
-            <h2>Transferir <span class="highlight">SOL</span></h2>
+            <h2>Enviar <span class="highlight">SOL</span></h2>
             <div class="form-group">
                 <label for="network-select">Red Solana:</label>
                 <select id="network-select" class="form-control">
@@ -42,12 +52,12 @@
                 <label for="amount-sol">Cantidad de SOL:</label>
                 <input type="number" id="amount-sol" class="form-control" step="0.0001" value="0.01">
             </div>
-            <button id="transfer-button" class="btn btn-success">Transferir SOL</button>
+            <button id="transfer-button" class="btn btn-success">Enviar SOL</button>
             <p id="transaction-status" class="transaction-status"></p>
         </section>
 
         <footer class="app-footer">
-            <p>&copy; 2025 Aplicación Solana. Todos los derechos reservados.</p>
+            <p>&copy; 2025 QuickSOL. Todos los derechos reservados.</p>
         </footer>
     </div>
 
