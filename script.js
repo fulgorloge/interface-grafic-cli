@@ -21,7 +21,7 @@ const elements = {
     recipientAddressInput: document.getElementById('recipient-address'),
     amountSolInput: document.getElementById('amount-sol'),
     networkSelect: document.getElementById('network-select'),
-    transactionStatusText: document.getElementById('transaction-status'), // <-- Esta coma es crucial y fue una de las correcciones iniciales
+    transactionStatusText: document.getElementById('transaction-status'),
 };
 
 // --- Utility Functions ---
