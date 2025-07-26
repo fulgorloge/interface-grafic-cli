@@ -16,6 +16,7 @@ const elements = {
     connectButton: document.getElementById('connect-button'),
     walletAddressText: document.getElementById('wallet-address'),
     walletMessageText: document.getElementById('wallet-message'),
+    walletBalanceText: document.getElementById('wallet-balance'), // <-- NUEVO: Elemento para el saldo
     transferSection: document.getElementById('transfer-section'),
     transferButton: document.getElementById('transfer-button'),
     recipientAddressInput: document.getElementById('recipient-address'),
@@ -67,11 +68,12 @@ const detectWalletProviders = () => {
  * Actualiza la interfaz de usuario según el estado de conexión de la billetera.
  */
 const updateUI = () => {
-    const { connectButton, walletAddressText, walletMessageText, transferSection } = elements;
+    const { connectButton, walletAddressText, walletMessageText, walletBalanceText, transferSection } = elements;
 
     // Resetear mensajes y estilos
     walletMessageText.className = 'message-text';
     walletAddressText.textContent = 'Estado: Desconectado';
+    walletBalanceText.textContent = ''; // Limpiar saldo
     connectButton.style.display = 'block';
     connectButton.disabled = false;
     transferSection.classList.add('hidden'); // Ocultar la sección de transferencia por defecto
@@ -82,6 +84,7 @@ const updateUI = () => {
         walletMessageText.textContent = ''; // Limpiar mensaje de billetera
         connectButton.style.display = 'none'; // Ocultar botón de conectar
         transferSection.classList.remove('hidden'); // Mostrar sección de transferencia
+        fetchBalance(); // <-- Llamar a fetchBalance al conectar o actualizar UI
     } else if (walletState.type === 'metamask' && walletState.provider) {
         // MetaMask detectada pero Snap no conectado o no tiene clave pública
         walletAddressText.textContent = 'MetaMask detectada.';
@@ -112,6 +115,33 @@ const setTransactionStatus = (message, type = 'info') => {
     elements.transactionStatusText.className = `transaction-status text-${type}`;
 };
 
+/**
+ * Obtiene y muestra el balance de SOL de la billetera conectada.
+ */
+const fetchBalance = async () => {
+    const { publicKey } = walletState;
+    if (!publicKey) {
+        elements.walletBalanceText.textContent = '';
+        return;
+    }
+
+    elements.walletBalanceText.textContent = 'Cargando saldo...';
+    try {
+        const { Connection, LAMPORTS_PER_SOL } = solanaWeb3;
+        const network = elements.networkSelect.value;
+        const connection = new Connection(solanaWeb3.clusterApiUrl(network));
+
+        const balanceLamports = await connection.getBalance(publicKey);
+        const balanceSOL = balanceLamports / LAMPORTS_PER_SOL;
+
+        elements.walletBalanceText.textContent = `Saldo: ${balanceSOL.toFixed(4)} SOL`;
+    } catch (error) {
+        console.error('Error al obtener el saldo:', error);
+        elements.walletBalanceText.textContent = 'Error al cargar saldo.';
+    }
+};
+
+
 // --- Wallet Connection Logic ---
 
 /**
@@ -128,6 +158,7 @@ const connectSolanaNative = async (provider, onlyIfTrusted = false) => {
             walletState.provider = provider;
             walletState.publicKey = provider.publicKey;
             console.log(`Billetera Solana nativa conectada: ${provider.publicKey.toBase58()}`);
+            fetchBalance(); // <-- Obtener saldo al conectar
             return true;
         }
         return false;
@@ -224,6 +255,7 @@ const connectMetaMaskWithSolanaSnap = async (metamaskProvider) => {
         walletState.publicKey = publicKey; // La clave pública del Snap
         console.log('MetaMask conectada y Solana Snap listo.');
         setTransactionStatus('MetaMask conectada con Solana Snap.', 'success');
+        fetchBalance(); // <-- Obtener saldo al conectar
         return true;
     } catch (error) {
         console.error('Error al conectar MetaMask con Solana Snap:', error);
@@ -245,11 +277,8 @@ window.addEventListener('load', async () => {
     const { solanaNative, metamask } = detectWalletProviders();
 
     if (solanaNative) {
-        // Solo intentar conexión automática con billeteras nativas.
-        // MetaMask con Snap requiere interacción explícita (aunque la UI la preparamos).
         await connectSolanaNative(solanaNative, true);
     } else if (metamask) {
-        // Si solo se detecta MetaMask, preparamos el estado para que la UI pida conectar Snap.
         walletState.type = 'metamask';
         walletState.provider = metamask;
     }
@@ -287,11 +316,20 @@ elements.connectButton.addEventListener('click', async () => {
 
     if (connected) {
         setTransactionStatus('Billetera conectada exitosamente.', 'success');
+        // El saldo ya se obtiene dentro de connectSolanaNative / connectMetaMaskWithSolanaSnap
     } else {
         // El mensaje de error ya se estableció en las funciones de conexión
     }
     updateUI(); // Actualizar la UI después del intento de conexión
 });
+
+// Listener para el cambio de red
+elements.networkSelect.addEventListener('change', () => {
+    if (walletState.publicKey) {
+        fetchBalance(); // Recargar el saldo cuando la red cambia
+    }
+});
+
 
 // Listener para el botón de transferencia SOL
 elements.transferButton.addEventListener('click', async () => {
@@ -320,7 +358,6 @@ elements.transferButton.addEventListener('click', async () => {
     }
 
     try {
-        // IMPORTANTE: Aquí se utilizan las clases de solanaWeb3, por eso es CRÍTICO que se cargue antes en el HTML
         const { Connection, PublicKey, Transaction, SystemProgram, LAMPORTS_PER_SOL } = solanaWeb3;
 
         // Validar dirección del destinatario
@@ -345,20 +382,26 @@ elements.transferButton.addEventListener('click', async () => {
         );
 
         transaction.feePayer = payerPublicKey;
-        transaction.recentBlockhash = (await connection.getRecentBlockhash()).blockhash;
+        // Obtener un blockhash reciente y el lastValidBlockHeight para la transacción
+        const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash('finalized');
+        transaction.recentBlockhash = blockhash;
 
-        // Firma la transacción usando el proveedor correcto (solanaSnapProvider o provider nativo)
+
         const signedTransaction = await signerProvider.signTransaction(transaction);
 
-        // Envía la transacción firmada a la red Solana
         const signature = await connection.sendRawTransaction(signedTransaction.serialize());
 
-        // Espera la confirmación de la transacción en la red
         setTransactionStatus(`Transacción enviada. Esperando confirmación... Firma: ${signature.substring(0, 10)}...`, 'info');
-        await connection.confirmTransaction(signature, 'confirmed'); // 'confirmed' o 'finalized'
+        await connection.confirmTransaction({
+            signature: signature,
+            blockhash: blockhash, // Usar el blockhash de la transacción firmada
+            lastValidBlockHeight: lastValidBlockHeight
+        }, 'confirmed');
 
         setTransactionStatus(`¡Transacción exitosa! Firma: ${signature}`, 'success');
         console.log('Transacción exitosa:', signature);
+        fetchBalance(); // <-- Actualizar saldo después de una transacción exitosa
+
     } catch (error) {
         console.error('Error al transferir SOL:', error);
         let errorMessage = error.message;
