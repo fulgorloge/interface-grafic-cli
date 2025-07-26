@@ -3,8 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>QuickSOL</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <title>QuickSOL</title> <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
@@ -12,8 +11,7 @@
 <body>
     <div class="container">
         <header class="app-header">
-            <h1><span class="highlight">Quick</span>SOL</h1>
-            <p id="wallet-message" class="message-text"></p>
+            <h1><span class="highlight">Quick</span>SOL</h1> <p id="wallet-message" class="message-text"></p>
         </header>
 
         <section class="wallet-status">
@@ -63,6 +61,7 @@
 
     <script src="https://bundle.run/buffer@6.0.3"></script>
     <script>
+        // Polyfill para Buffer si no está disponible (necesario para algunas operaciones de Solana)
         if (typeof window.Buffer === 'undefined' || typeof window.Buffer.from !== 'function') {
             if (typeof Buffer !== 'undefined' && typeof Buffer.from === 'function') {
                 window.Buffer = Buffer;
