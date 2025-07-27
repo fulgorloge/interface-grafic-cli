@@ -10,9 +10,11 @@
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
 </head>
-<body class="dark-theme"> <div class="theme-toggle-container">
+<body class="dark-theme"> 
+    <div class="theme-toggle-container">
         <button id="theme-toggle" class="theme-toggle-btn">
-            <i class="fas fa-sun"></i> </button>
+            <i class="fas fa-sun"></i>
+        </button>
     </div>
 
     <div class="container">
@@ -23,15 +25,15 @@
 
         <div class="wallet-selection-container">
             <button class="wallet-button" id="connect-phantom">
-                <img src="assets/images/phantom-icon.svg" alt="Phantom Icon">
+                <img src="https://phantom.app/ul/phantom-icon.svg" alt="Phantom Icon">
                 <span>Phantom</span>
             </button>
             <button class="wallet-button" id="connect-solflare">
-                <img src="assets/images/solflare-favicon.ico" alt="Solflare Icon">
+                <img src="https://solflare.com/favicon.ico" alt="Solflare Icon">
                 <span>Solflare</span>
             </button>
             <button class="wallet-button" id="connect-ledger" disabled>
-                <img src="assets/images/ledger_logo_rgb.png" alt="Ledger Icon">
+                <img src="https://www.ledger.com/wp-content/uploads/2021/04/ledger_logo_rgb.png" alt="Ledger Icon">
                 <span>Ledger (próx.)</span>
             </button>
         </div>
@@ -57,7 +59,7 @@
                 <input type="number" id="send-amount" class="form-control" placeholder="0.00" step="0.000001" required>
                 <span class="validation-message" id="send-amount-error"></span>
             </div>
-            <p id="estimated-fees">Tarifa estimada: **0.000005 SOL**</p>
+            <p id="estimated-fees">Tarifa estimada: <strong>0.000005 SOL</strong></p>
             <button class="btn btn-primary" id="send-sol-btn">
                 Enviar SOL 
                 <span class="spinner" id="send-sol-spinner" style="display: none;"></span>
@@ -92,7 +94,7 @@
                 <button class="btn btn-chart-timeframe" data-timeframe="365">1 Año</button>
             </div>
             <div id="sol-price-chart" class="price-chart">
-                 <div id="chart-loading-overlay" class="loading-overlay" style="display: flex;">
+                <div id="chart-loading-overlay" class="loading-overlay" style="display: flex;">
                     <div class="spinner"></div>
                 </div>
             </div>
@@ -105,10 +107,9 @@
             <h2>Historial de <span class="highlight">Transacciones</span></h2>
             <div id="transaction-history">
                 <p class="text-secondary">Conecta tu billetera para ver el historial.</p>
-                </div>
+            </div>
         </div>
-        
-        </div>
+    </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@solana/web3.js@latest/lib/index.iife.min.js"></script>
     <script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
