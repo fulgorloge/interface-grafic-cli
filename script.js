@@ -1,5 +1,5 @@
 // Accede a la librería de Solana (cargada globalmente en index.html)
-const solanaWeb3 = SolanaWeb3; 
+const solanaWeb3 = SolanaWeb3;
 
 let provider; // Wallet adapter (Phantom o Solflare)
 let publicKey; // Public key del usuario
@@ -214,7 +214,7 @@ async function sendSol() {
         await connection.confirmTransaction({ signature, blockhash }, 'finalized');
 
         showStatus(`Transacción confirmada: <a href="https://solscan.io/tx/${signature}" target="_blank" style="color: inherit; text-decoration: underline;">Ver en Solscan</a>`, 'success');
-        
+
         // Limpiar campos y actualizar balance
         recipientAddressInput.value = '';
         sendAmountInput.value = '';
@@ -284,7 +284,7 @@ function convertCryptoToFiat() {
 async function fetchChartDataFromCoinGecko(days) {
     const coingeckoId = 'solana'; // ID de Solana en CoinGecko
     const currency = 'usd'; // Moneda base
-    
+
     // Usamos el endpoint ohlc para datos de velas
     const urlOhlc = `https://api.coingecko.com/api/v3/coins/${coingeckoId}/ohlc?vs_currency=${currency}&days=${days}`;
     // Y el endpoint market_chart para datos de volumen (el ohlc no lo incluye)
@@ -309,7 +309,7 @@ async function fetchChartDataFromCoinGecko(days) {
             low: item[3],
             close: item[4],
         }));
-        
+
         // Formatear datos de volumen
         // market_chart.total_volumes tiene [timestamp_ms, volume]
         const formattedVolumeData = marketChartData.total_volumes.map(item => ({
@@ -319,10 +319,10 @@ async function fetchChartDataFromCoinGecko(days) {
             // Esto requiere encontrar la vela correspondiente para ese tiempo
             color: (formattedCandleData.find(c => c.time === item[0] / 1000)?.open < formattedCandleData.find(c => c.time === item[0] / 1000)?.close ? getComputedStyle(document.body).getPropertyValue('--accent-main') : getComputedStyle(document.body).getPropertyValue('--error-color')) + '30'
         }));
-        
+
         chartLoadingOverlay.style.display = 'none'; // Ocultar overlay de carga
         return { candles: formattedCandleData, volume: formattedVolumeData };
-        
+
     } catch (error) {
         console.error('Error fetching chart data from CoinGecko:', error);
         chartLoadingOverlay.style.display = 'none'; // Ocultar overlay
@@ -407,7 +407,7 @@ function initializeChart() {
 async function loadChartData(days) {
     chartLoadingOverlay.style.display = 'flex'; // Mostrar overlay de carga
     const { candles, volume } = await fetchChartDataFromCoinGecko(days);
-    
+
     candlestickSeries.setData(candles);
     volumeSeries.setData(volume); // Setear datos de volumen
     chartLoadingOverlay.style.display = 'none'; // Ocultar overlay de carga
@@ -485,4 +485,15 @@ document.addEventListener('DOMContentLoaded', async () => {
         button.addEventListener('click', () => {
             timeframeButtons.forEach(btn => btn.classList.remove('active'));
             button.classList.add('active');
-            loadChartData(parseInt(
+            loadChartData(parseInt(button.dataset.timeframe)); // <-- Corrección aquí
+        });
+    });
+
+    // Event listener para el botón de cambio de tema
+    themeToggleBtn.addEventListener('click', () => {
+        const currentTheme = document.body.classList.contains('dark-theme') ? 'dark-theme' : 'light-theme';
+        const newTheme = currentTheme === 'dark-theme' ? 'light-theme' : 'dark-theme';
+        applyTheme(newTheme);
+    });
+
+}); // <-- Cierre correcto del DOMContentLoaded
